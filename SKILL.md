@@ -16,13 +16,10 @@ Help users create, convert, and maintain Claude Code Skills through:
 
 Before working on any skill task, refresh your understanding by reviewing these authoritative sources:
 
-**Core Concepts & Engineering:**
-- https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills
-
 **Official Documentation:**
-- https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview
-- https://docs.claude.com/en/docs/agents-and-tools/agent-skills/best-practices
-- https://docs.claude.com/en/docs/claude-code/sub-agents
+- https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview.md
+- https://docs.claude.com/en/docs/agents-and-tools/agent-skills/best-practices.md
+- https://docs.claude.com/en/docs/claude-code/sub-agents.md
 
 Use WebFetch tool to access these URLs when needed to ensure you're working with the latest information and best practices.
 

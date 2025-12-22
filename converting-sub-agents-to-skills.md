@@ -6,10 +6,9 @@ This document provides detailed guidance on converting existing Claude Code sub-
 
 Before starting any conversion, review these official documentation sources:
 
-- **Sub-Agents Overview**: https://docs.claude.com/en/docs/claude-code/sub-agents
-- **Agent Skills Overview**: https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview
-- **Best Practices**: https://docs.claude.com/en/docs/agents-and-tools/agent-skills/best-practices
-- **Engineering Blog**: https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills
+- **Sub-Agents Overview**: https://docs.claude.com/en/docs/claude-code/sub-agents.md
+- **Agent Skills Overview**: https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview.md
+- **Best Practices**: https://docs.claude.com/en/docs/agents-and-tools/agent-skills/best-practices.md
 
 Use WebFetch to access these URLs for the latest information.
 
