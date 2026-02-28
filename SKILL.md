@@ -184,7 +184,24 @@ When refining existing skills:
 
 When converting existing Claude Code sub-agent configurations (those in `~/.claude/agents/`), see `./converting-sub-agents-to-skills.md` for comprehensive guidance.
 
-**Quick Overview:**
+# Building Composio Integration Skills
+
+When creating a skill that wraps a Composio SaaS integration (Gmail, Slack, GitHub, Notion, HubSpot, etc.), see `./reference/composio-patterns.md` for authentication patterns, SKILL.md templates, multi-app naming conventions, and error handling.
+
+# Building MCP-Powered Skills
+
+When creating a skill that invokes an MCP server (browser automation, database queries, web search, filesystem), see `./reference/mcp-integration.md` for MCP setup templates, tool invocation patterns, and security considerations.
+
+# Templates
+
+For new skill creation, use the appropriate template:
+- **API integration** (wrapping a REST/GraphQL API): `./templates/api-skill-template.md`
+- **Multi-step workflow** (phased process, user confirmation points): `./templates/workflow-skill-template.md`
+- **Composio SaaS action** (acting in external apps): `./reference/composio-patterns.md`
+- **MCP tool invocation** (database, browser, search): `./reference/mcp-integration.md`
+- **Basic skill** (simple single-purpose): `./templates/skill-template.md`
+
+**Quick Overview (sub-agent conversion):**
 1. Analyze the sub-agent's YAML frontmatter and instructions
 2. Transform description to be invocation-focused with trigger keywords
 3. Convert to skill format (remove `model`, `color`, `tools` fields)
