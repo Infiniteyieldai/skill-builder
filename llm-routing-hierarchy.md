@@ -1,184 +1,257 @@
 # LLM Routing Hierarchy & Token Cost Strategy
+# Projects: GoMining | Content Machine | Alpha Core | Tax Agent | Gmail Agent | Maintenance Super | Agentic Trader
 
 ## Current Status (2026-03-16)
-
-> **⚠️ Anthropic Credits: DEPLETED** — `cachedExtraUsageDisabledReason: "out_of_credits"`
-> Top up at https://console.anthropic.com/settings/billing
-
-> **⚠️ No third-party API keys found** — `.env.shared` file does not exist yet.
-> See Section 5 to create it.
+> **⚠️ Anthropic Credits: DEPLETED** — top up at https://console.anthropic.com/settings/billing
+> **⚠️ .env.shared missing** — create at `~/.claude/.env.shared` (see Section 5)
 
 ---
 
-## 1. The Problem: Token Cost Hierarchy
-
-You have access to 4 LLM providers. Not all work is equal — don't burn
-Claude Opus/Sonnet tokens on tasks that a cheaper model handles fine.
+## 1. Cost Tiers
 
 ```
-COST (high → low)          CAPABILITY (high → low)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Claude Opus 4.6            Complex reasoning, architecture, security, code review
-Claude Sonnet 4.6          General coding, multi-step tasks, analysis
-GPT-4o / Gemini 1.5 Pro    Drafting, summarisation, structured output
-Gemini Flash / GPT-4o-mini Fast, cheap: formatting, classification, simple Q&A
-Grok 2 / Grok 3            Real-time web data, Twitter/X context, news
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
+TIER 1 — EXPENSIVE (Claude)        Use sparingly, high-value work only
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Claude Opus 4.6    ~$15/$75 per 1M   Critical logic, security, architecture
+Claude Sonnet 4.6  ~$3/$15 per 1M    Default coding model
+Claude Haiku 4.5   ~$0.25/$1.25/1M   Fast tasks, boilerplate, commits
 
----
+TIER 2 — MID (OpenAI / Google Pro)  Good for content, docs, drafts
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GPT-4o             ~$2.50/$10 /1M    Scripts, email drafts, content
+Gemini 1.5 Pro     ~$1.25/$5  /1M    Long docs (ATO PDFs, tax law)
 
-## 2. Routing Decision Framework
+TIER 3 — CHEAP (Flash / Mini)       Default for bulk and simple tasks
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GPT-4o-mini        ~$0.15/$0.60/1M   Captions, hashtags, classification
+Gemini 2.0 Flash   ~$0.075/$0.30/1M  Cheapest useful model — batch work
 
-### Use Claude Opus 4.6 for:
-- Architecture decisions and system design
-- Security audits and vulnerability analysis
-- Complex multi-file refactors
-- Debugging hard/novel problems
-- Writing production-critical code
-- Reasoning about ambiguous requirements
-- Creating new skills, agents, or Claude config
-
-### Use Claude Sonnet 4.6 for:
-- Standard coding tasks (new features, bug fixes)
-- Code explanation and documentation
-- Multi-step CLI workflows
-- PR reviews on non-critical code
-- Generating tests
-- **Default Claude Code model** (already your current model)
-
-### Use GPT-4o / Gemini 1.5 Pro for:
-- Drafting README files, blog posts, docs
-- Summarising long documents or logs
-- Structured JSON/YAML generation from examples
-- Marketing copy, email drafts
-- Translating between formats (CSV→JSON, etc.)
-- First-pass code scaffolding to refine with Claude
-
-### Use Gemini 2.0 Flash / GPT-4o-mini for:
-- Classifying or tagging items in bulk
-- Simple regex/pattern matching tasks
-- Formatting and linting output
-- Checking spelling/grammar
-- Generating commit message drafts
-- Answering FAQ-style questions
-- Parsing and extracting structured data from text
-
-### Use Grok 2/3 for:
-- Real-time crypto news and sentiment (feeds your crypto-gem-scanner)
-- Twitter/X trend analysis
-- Current events context
-- Social signal detection for trading
-- Time-sensitive market research
-
----
-
-## 3. n8n Routing Workflow
-
-Your Automation-stack uses n8n. Build an LLM Router workflow:
-
-```
-[Trigger: Task arrives]
-        ↓
-[Classify task complexity] ← use Gemini Flash (cheap classifier)
-        ↓
-  ┌─────┴──────┐
-  │ complexity? │
-  └─────┬──────┘
-        ├── "critical/complex"  → Claude Opus 4.6
-        ├── "standard/code"     → Claude Sonnet 4.6
-        ├── "draft/format"      → GPT-4o or Gemini Pro
-        ├── "bulk/simple"       → Gemini Flash / GPT-4o-mini
-        └── "realtime/social"   → Grok API
-```
-
-### n8n Node Setup
-Each provider needs an HTTP Request node or use the built-in AI nodes:
-- **Anthropic**: n8n has native Anthropic node
-- **OpenAI**: n8n has native OpenAI node
-- **Google Gemini**: n8n has native Google AI node
-- **Grok/xAI**: HTTP Request node → `https://api.x.ai/v1/chat/completions`
-
----
-
-## 4. Claude Code Model Selection
-
-Claude Code supports per-task model selection via sub-agents and skills.
-
-### In settings.json — set default model:
-```json
-{
-  "model": "claude-sonnet-4-6",
-  "smallFastModel": "claude-haiku-4-5-20251001"
-}
-```
-
-### In sub-agents — specify model per agent:
-```yaml
----
-name: security-auditor
-model: claude-opus-4-6
-description: Deep security analysis requiring highest capability
----
-```
-
-```yaml
----
-name: commit-message-writer
-model: claude-haiku-4-5-20251001
-description: Fast, cheap commit message generation
----
-```
-
-### Task routing in CLAUDE.md:
-Tell Claude when to use which model by putting rules in your global CLAUDE.md:
-
-```markdown
-## Model Selection Rules
-- Use Opus only for: security analysis, architecture, novel debugging
-- Default to Sonnet for: all standard coding work
-- Use Haiku for: commit messages, simple formatting, quick lookups
-- Delegate to external LLMs via n8n for: drafting, docs, bulk tasks
+TIER 4 — REAL-TIME (Grok)          For live market/social data
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Grok 2/3           ~$2/$10  /1M     Twitter/X, crypto sentiment, news
 ```
 
 ---
 
-## 5. Create the .env.shared File
+## 2. Per-Project Routing
 
-This file should live in a location accessible across your projects.
-Suggested path: `~/.claude/.env.shared`
+### GoMining Reel Generation
+`/Users/aidengoode/Claude-Antigravity/GoMining Reel Generation/`
+
+| Task | Model | Reason |
+|------|-------|--------|
+| Video script writing | GPT-4o | Creative content, mid-cost |
+| Caption + hashtag generation | Gemini Flash | Bulk, repetitive — cheapest |
+| Reel scheduling logic (code) | Claude Sonnet | Standard code task |
+| Video pipeline architecture | Claude Sonnet | Standard code task |
+| Voiceover text variations (bulk) | Gemini Flash | Many variants cheaply |
+
+---
+
+### Content Machine (TikTok Automation)
+`/Users/aidengoode/Claude-Antigravity/content-machine/`
+
+| Task | Model | Reason |
+|------|-------|--------|
+| TikTok post scripts | GPT-4o | Trending tone, good at short-form |
+| Hashtag research/generation | Gemini Flash | Cheap batch task |
+| TikTok API integration code | Claude Sonnet | Standard coding |
+| Content strategy planning | GPT-4o | Creative planning |
+| Bulk caption variants (A/B) | Gemini Flash | Many cheap variants |
+| Post scheduling logic | Claude Sonnet | Code task |
+
+---
+
+### Alpha Core — Autonomous Income Ecosystem
+`/Users/aidengoode/Claude-Antigravity/Alpha Core- Autonomous Income Ecosystem/`
+
+| Task | Model | Reason |
+|------|-------|--------|
+| Agent orchestration design | Claude Opus | Architecture — most critical project |
+| Inter-agent communication logic | Claude Sonnet | Standard complex code |
+| Income stream monitoring code | Claude Sonnet | Standard code |
+| Status reports / summaries | Gemini Flash | Cheap summary generation |
+| Security audit of agent system | Claude Opus | Security-critical |
+| New agent integration | Claude Sonnet | Standard code |
+| High-level strategy decisions | Claude Opus | Requires deep reasoning |
+
+---
+
+### Australian Tax Agent
+`/Users/aidengoode/Claude-Antigravity/Australian Tax Agent/`
+
+| Task | Model | Reason |
+|------|-------|--------|
+| ATO tax law interpretation | Claude Opus | Legal accuracy critical |
+| Tax calculation logic (code) | Claude Sonnet | Standard code |
+| Summarising ATO PDF documents | Gemini 1.5 Pro | Long context (128k), cheap |
+| Tax form filling logic | Claude Sonnet | Standard code |
+| Compliance rule validation | Claude Opus | High-stakes, accuracy required |
+| User-facing tax explanations | GPT-4o | Clear plain-English output |
+| Batch transaction categorisation | Gemini Flash | High volume, cheap |
+
+---
+
+### Gmail Agent
+`/Users/aidengoode/Claude-Antigravity/Gmail Agent/`
+
+| Task | Model | Reason |
+|------|-------|--------|
+| Email triage/classification | Gemini Flash | Bulk classification, very cheap |
+| Email reply drafting | GPT-4o | Natural tone, good at email |
+| Gmail API integration code | Claude Sonnet | Standard code |
+| Priority inbox rules (code) | Claude Sonnet | Standard code |
+| Urgent/sensitive email handling | Claude Sonnet | Context needed |
+| Email summarisation (bulk) | Gemini Flash | Many emails, cheap |
+| Auto-reply template generation | GPT-4o-mini | Simple templates |
+
+---
+
+### Maintenance Superintendent
+`/Users/aidengoode/Claude-Antigravity/Maintenance_Superintendent/`
+
+| Task | Model | Reason |
+|------|-------|--------|
+| Maintenance schedule logic | Claude Sonnet | Standard code |
+| Job card generation (bulk) | Gemini Flash | Templated, cheap |
+| Equipment failure diagnosis | Claude Sonnet | Reasoning needed |
+| Report writing / summaries | GPT-4o | Professional prose |
+| Predictive maintenance models | Claude Sonnet | Code + analysis |
+| Compliance documentation | GPT-4o | Document-quality output |
+| Parts ordering automation | Claude Haiku | Simple rule-based logic |
+
+---
+
+### Agentic Trader (Personal)
+`/Users/aidengoode/Claude-Antigravity/agentic-trader-personal/`
+
+| Task | Model | Reason |
+|------|-------|--------|
+| Trading strategy design | Claude Opus | High-stakes, requires best reasoning |
+| Risk management rules | Claude Opus | Accuracy critical — real money |
+| Order execution code | Claude Sonnet | Standard code |
+| Market sentiment analysis | Grok 2/3 | Real-time Twitter/X data |
+| Crypto news monitoring | Grok 2/3 | Live data, x.ai trained on it |
+| Backtesting logic | Claude Sonnet | Standard code |
+| Trade log summarisation | Gemini Flash | Cheap batch summaries |
+| Portfolio performance reports | GPT-4o | Good at financial prose |
+| Exchange API integration | Claude Sonnet | Standard code |
+| DEX scanning (from gem-scanner) | n8n + Grok | Realtime, automated |
+
+---
+
+## 3. Decision Flowchart
+
+```
+Task comes in
+     │
+     ▼
+Is it trading logic or tax law? ──YES──► Claude Opus
+     │
+     ▼
+Is it a security/architecture decision? ──YES──► Claude Opus
+     │
+     ▼
+Is it writing code? ──YES──► Claude Sonnet (default)
+     │
+     ▼
+Is it real-time market/social data? ──YES──► Grok via n8n
+     │
+     ▼
+Is it a long document to summarise? ──YES──► Gemini 1.5 Pro (128k context)
+     │
+     ▼
+Is it creative content (scripts/emails)? ──YES──► GPT-4o
+     │
+     ▼
+Is it bulk/repetitive/classification? ──YES──► Gemini Flash (cheapest)
+     │
+     ▼
+Default ──────────────────────────────────► Gemini Flash
+```
+
+---
+
+## 4. n8n Router Workflow (Build in Automation-Stack)
+
+Create a master "LLM Router" workflow in your n8n instance:
+
+```
+[Webhook: POST /llm-router]
+  body: { task_type, prompt, context, project }
+        │
+        ▼
+[Switch node on task_type]
+  ├── "trading_strategy"    → Anthropic node (claude-opus-4-6)
+  ├── "tax_law"             → Anthropic node (claude-opus-4-6)
+  ├── "code_standard"       → Anthropic node (claude-sonnet-4-6)
+  ├── "content_script"      → OpenAI node (gpt-4o)
+  ├── "email_draft"         → OpenAI node (gpt-4o)
+  ├── "bulk_classify"       → Google AI node (gemini-2.0-flash)
+  ├── "long_doc_summary"    → Google AI node (gemini-1.5-pro)
+  ├── "market_sentiment"    → HTTP Request → api.x.ai (grok-2)
+  └── "default"             → Google AI node (gemini-2.0-flash)
+        │
+        ▼
+[Return response to caller]
+```
+
+All your projects call this single endpoint — one place to update routing.
+
+---
+
+## 5. Create ~/.claude/.env.shared
+
+Run this on your **local Mac** to create the file:
 
 ```bash
-# ~/.claude/.env.shared
-# LLM Provider API Keys
-# DO NOT COMMIT THIS FILE
+cat > ~/.claude/.env.shared << 'EOF'
+# LLM API Keys — DO NOT COMMIT
+# Last updated: 2026-03-16
 
-# Anthropic (Claude)
-ANTHROPIC_API_KEY=sk-ant-...          # from console.anthropic.com
+# Anthropic (Claude) — console.anthropic.com
+ANTHROPIC_API_KEY=sk-ant-
 
-# OpenAI (GPT-4o, GPT-4o-mini)
-OPENAI_API_KEY=sk-proj-...            # from platform.openai.com
+# OpenAI (GPT-4o, GPT-4o-mini) — platform.openai.com
+OPENAI_API_KEY=sk-proj-
 
-# Google (Gemini Pro, Gemini Flash)
-GOOGLE_API_KEY=AIza...                # from aistudio.google.com
-GEMINI_API_KEY=AIza...                # same key, different env var name
+# Google (Gemini Pro + Flash) — aistudio.google.com
+GOOGLE_API_KEY=AIza
+GEMINI_API_KEY=AIza
 
-# xAI (Grok 2, Grok 3)
-XAI_API_KEY=xai-...                   # from console.x.ai
+# xAI (Grok 2/3) — console.x.ai
+XAI_API_KEY=xai-
 
-# GitHub (for MCP server + gh CLI)
-GITHUB_TOKEN=ghp_...                  # from github.com/settings/tokens
+# GitHub — github.com/settings/tokens (scope: repo, workflow)
+GITHUB_TOKEN=ghp_
 
-# n8n (if using API)
-N8N_API_KEY=...
-N8N_WEBHOOK_URL=https://your-n8n-instance/webhook/...
+# n8n
+N8N_API_KEY=
+N8N_WEBHOOK_URL=https://your-n8n-instance/webhook/llm-router
 
-# Telegram (crypto-gem-scanner alerts)
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
+# Telegram (Agentic Trader + Crypto Scanner alerts)
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+
+# TikTok (Content Machine)
+TIKTOK_CLIENT_KEY=
+TIKTOK_CLIENT_SECRET=
+TIKTOK_ACCESS_TOKEN=
+
+# Gmail (Gmail Agent) — OAuth via Google Cloud Console
+GMAIL_CLIENT_ID=
+GMAIL_CLIENT_SECRET=
+GMAIL_REFRESH_TOKEN=
+EOF
 ```
 
-### Wire into Claude Code settings.json:
+Then add to your `~/.zshrc` (Mac default shell):
+```bash
+echo 'if [ -f ~/.claude/.env.shared ]; then set -a; source ~/.claude/.env.shared; set +a; fi' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Then update `~/.claude/settings.json`:
 ```json
 {
   "model": "claude-sonnet-4-6",
@@ -187,79 +260,81 @@ TELEGRAM_CHAT_ID=...
     "OPENAI_API_KEY": "${OPENAI_API_KEY}",
     "GOOGLE_API_KEY": "${GOOGLE_API_KEY}",
     "XAI_API_KEY": "${XAI_API_KEY}",
-    "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+    "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+    "N8N_WEBHOOK_URL": "${N8N_WEBHOOK_URL}"
+  },
+  "hooks": {
+    "Stop": [{
+      "matcher": "",
+      "hooks": [{ "type": "command", "command": "~/.claude/stop-hook-git-check.sh" }]
+    }]
+  },
+  "permissions": {
+    "allow": ["Skill"]
   }
 }
 ```
 
-### Load in shell profile:
-```bash
-# Add to ~/.bashrc or ~/.zshrc
-if [ -f ~/.claude/.env.shared ]; then
-  set -a
-  source ~/.claude/.env.shared
-  set +a
-fi
+---
+
+## 6. Sub-Agents to Create in ~/.claude/agents/
+
+These route automatically to the right model within Claude Code:
+
+### `trading-strategist.md` (Opus — high stakes)
+```yaml
+---
+name: trading-strategist
+model: claude-opus-4-6
+description: Use for Agentic Trader strategy design, risk rules, and trading logic
+---
+You are an expert quantitative trading strategist...
+```
+
+### `tax-compliance.md` (Opus — accuracy critical)
+```yaml
+---
+name: tax-compliance
+model: claude-opus-4-6
+description: Australian tax law interpretation and compliance logic for Tax Agent project
+---
+You are an Australian tax compliance expert...
+```
+
+### `content-writer.md` (Haiku — cheap creative)
+```yaml
+---
+name: content-writer
+model: claude-haiku-4-5-20251001
+description: Fast content generation for GoMining reels and Content Machine
+---
+You write short-form social media content...
+```
+
+### `commit-writer.md` (Haiku — cheapest)
+```yaml
+---
+name: commit-writer
+model: claude-haiku-4-5-20251001
+description: Generates concise git commit messages
+---
+Write a conventional commit message for the staged changes.
 ```
 
 ---
 
-## 6. Model Cost Reference (as of 2026)
+## 7. Monthly Token Budget Estimate
 
-| Model | Input (per 1M tokens) | Output (per 1M tokens) | Best For |
-|-------|----------------------|------------------------|----------|
-| Claude Opus 4.6 | ~$15 | ~$75 | Critical work only |
-| Claude Sonnet 4.6 | ~$3 | ~$15 | Default coding |
-| Claude Haiku 4.5 | ~$0.25 | ~$1.25 | Simple tasks |
-| GPT-4o | ~$2.50 | ~$10 | Docs, drafts |
-| GPT-4o-mini | ~$0.15 | ~$0.60 | Bulk/cheap |
-| Gemini 1.5 Pro | ~$1.25 | ~$5 | Long context |
-| Gemini 2.0 Flash | ~$0.075 | ~$0.30 | Fastest/cheapest |
-| Grok 2 | ~$2 | ~$10 | Real-time data |
+Assuming moderate daily usage across all projects:
 
-**Rule of thumb:** Gemini Flash is ~200x cheaper than Opus for the same token count.
-Use it as your default for anything that doesn't need deep reasoning.
+| Spend | Model | Tasks |
+|-------|-------|-------|
+| ~$20/mo | Claude Sonnet | Daily coding across all projects |
+| ~$10/mo | Claude Opus | Trading/tax critical decisions |
+| ~$5/mo | GPT-4o | Content scripts, email drafts |
+| ~$2/mo | Gemini Flash | Bulk classification, captions |
+| ~$3/mo | Grok | Market sentiment for trader |
+| **~$40/mo total** | | Across all 7 projects |
 
----
-
-## 7. Practical Workflow Examples
-
-### Example: Crypto gem scanner enrichment
-```
-1. DEXScreener token detected (n8n trigger)
-2. Grok → get Twitter/X sentiment for token  [cheap, real-time]
-3. Gemini Flash → classify risk level          [cheap classifier]
-4. IF high risk: Claude Sonnet → deeper analysis [mid cost]
-5. Telegram alert with combined output
-```
-
-### Example: GitHub PR handling
-```
-1. PR opened (GitHub webhook → n8n)
-2. Gemini Flash → summarise what changed       [cheap]
-3. GPT-4o-mini → generate first-pass review    [cheap]
-4. IF security-related: Claude Opus → deep audit [expensive, justified]
-5. Post review comment via GitHub MCP
-```
-
-### Example: Content Machine (TikTok)
-```
-1. Video topic decided
-2. GPT-4o → write script draft                 [cheap]
-3. Gemini Flash → generate hashtags/captions   [very cheap]
-4. Claude Sonnet → review + refine final copy  [only if needed]
-5. Post via TikTok API
-```
-
----
-
-## 8. Action Plan
-
-- [ ] Create `~/.claude/.env.shared` with your API keys
-- [ ] Add `source ~/.claude/.env.shared` to shell profile
-- [ ] Update `~/.claude/settings.json` with env section
-- [ ] Create `~/.claude/CLAUDE.md` with model routing rules (see report)
-- [ ] Top up Anthropic credits at console.anthropic.com
-- [ ] Build n8n LLM router workflow in Automation-stack
-- [ ] Create Haiku sub-agent for cheap/fast tasks in Claude Code
-- [ ] Register for xAI API at console.x.ai (feed into crypto-gem-scanner)
+Without routing: using Opus for everything = **~$200-400/mo**
+With routing: **~$40/mo** — ~85% cost reduction
